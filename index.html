@@ -99,14 +99,21 @@
             font-size: 13px;
         }
 
-        .week-header {
+        .day-header {
             background: #ecf0f1;
             text-align: center;
-            padding: 6px 4px;
-            font-size: 11px;
+            padding: 4px 2px;
+            font-size: 9px;
             color: #7f8c8d;
             border: 1px solid #bdc3c7;
-            width: 50px;
+            width: 25px;
+            font-weight: 500;
+            min-width: 25px;
+        }
+
+        .day-header.weekend {
+            background: #fff2e6;
+            color: #e67e22;
         }
 
         .category-header {
@@ -166,14 +173,15 @@
         }
 
         .timeline-cell {
-            width: 50px;
+            width: 25px;
             height: 45px;
             border: 1px solid #dee2e6;
             position: relative;
             background: white;
+            min-width: 25px;
         }
 
-        .timeline-cell:nth-child(4n) {
+        .timeline-cell.weekend {
             background: #fff8f0;
         }
 
@@ -503,20 +511,39 @@
             // ヘッダー作成
             let headerHTML = '<thead><tr><th class="category-header">カテゴリ / タスク</th>';
             
-            const months = [
-                '2025年6月', '2025年7月', '2025年8月', '2025年9月', 
-                '2025年10月', '2025年11月', '2025年12月', '2026年1月'
+            // 月のデータを作成（2025年6月〜2026年1月）
+            const monthsData = [
+                { name: '2025年6月', year: 2025, month: 5, days: 30 },
+                { name: '2025年7月', year: 2025, month: 6, days: 31 },
+                { name: '2025年8月', year: 2025, month: 7, days: 31 },
+                { name: '2025年9月', year: 2025, month: 8, days: 30 },
+                { name: '2025年10月', year: 2025, month: 9, days: 31 },
+                { name: '2025年11月', year: 2025, month: 10, days: 30 },
+                { name: '2025年12月', year: 2025, month: 11, days: 31 },
+                { name: '2026年1月', year: 2026, month: 0, days: 31 }
             ];
             
-            months.forEach(month => {
-                headerHTML += `<th class="month-header" colspan="4">${month}</th>`;
+            // 総日数を計算
+            let totalDays = 0;
+            monthsData.forEach(month => totalDays += month.days);
+            
+            // 月ヘッダー
+            monthsData.forEach(monthData => {
+                headerHTML += `<th class="month-header" colspan="${monthData.days}">${monthData.name}</th>`;
             });
             
             headerHTML += '</tr><tr><th></th>';
             
-            for(let i = 0; i < 8; i++) {
-                headerHTML += '<th class="week-header">W1</th><th class="week-header">W2</th><th class="week-header">W3</th><th class="week-header">W4</th>';
-            }
+            // 日付ヘッダー（1日単位）
+            monthsData.forEach(monthData => {
+                for(let day = 1; day <= monthData.days; day++) {
+                    const date = new Date(monthData.year, monthData.month, day);
+                    const dayOfWeek = date.getDay(); // 0=日曜, 6=土曜
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    const weekendClass = isWeekend ? ' weekend' : '';
+                    headerHTML += `<th class="day-header${weekendClass}">${day}</th>`;
+                }
+            });
             
             headerHTML += '</tr></thead>';
 
@@ -529,7 +556,7 @@
                 // カテゴリヘッダー
                 bodyHTML += '<tr>';
                 bodyHTML += `<td class="category-header">📁 ${category.name}</td>`;
-                for(let i = 0; i < 32; i++) {
+                for(let i = 0; i < totalDays; i++) {
                     bodyHTML += '<td style="border: 1px solid #dee2e6; background: #f8f9fa; height: 25px;"></td>';
                 }
                 bodyHTML += '</tr>';
@@ -544,9 +571,18 @@
                         <button class="edit-btn" onclick="editTask(${task.id})">✏️</button>
                     </td>`;
                     
-                    for(let i = 0; i < 32; i++) {
-                        bodyHTML += `<td class="timeline-cell" data-task-id="${task.id}"></td>`;
-                    }
+                    // タイムラインセル（1日単位）
+                    let dayIndex = 0;
+                    monthsData.forEach(monthData => {
+                        for(let day = 1; day <= monthData.days; day++) {
+                            const date = new Date(monthData.year, monthData.month, day);
+                            const dayOfWeek = date.getDay();
+                            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                            const weekendClass = isWeekend ? ' weekend' : '';
+                            bodyHTML += `<td class="timeline-cell${weekendClass}" data-task-id="${task.id}" data-day="${dayIndex}"></td>`;
+                            dayIndex++;
+                        }
+                    });
                     bodyHTML += '</tr>';
                 });
             });
@@ -561,7 +597,7 @@
         function renderTaskBars() {
             document.querySelectorAll('.task-bar').forEach(bar => bar.remove());
             
-            const projectStart = new Date('2025-06-15');
+            const projectStart = new Date('2025-06-01'); // 6月1日を基準にする
             
             tasks.forEach(task => {
                 const startDate = new Date(task.startDate);
@@ -569,20 +605,24 @@
                 
                 if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
                 
-                const startWeek = Math.max(0, Math.floor((startDate - projectStart) / (7 * 24 * 60 * 60 * 1000)));
-                const endWeek = Math.floor((endDate - projectStart) / (7 * 24 * 60 * 60 * 1000));
-                const durationWeeks = Math.max(1, endWeek - startWeek + 1);
+                // 日単位で計算
+                const startDay = Math.max(0, Math.floor((startDate - projectStart) / (24 * 60 * 60 * 1000)));
+                const endDay = Math.floor((endDate - projectStart) / (24 * 60 * 60 * 1000));
+                const durationDays = Math.max(1, endDay - startDay + 1);
                 
-                const startPercent = (startWeek / 32) * 100;
-                const widthPercent = Math.min((durationWeeks / 32) * 100, 100 - startPercent);
+                // 総日数（2025年6月〜2026年1月）
+                const totalDays = 30 + 31 + 31 + 30 + 31 + 30 + 31 + 31; // 245日
+                
+                const startPercent = (startDay / totalDays) * 100;
+                const widthPercent = Math.min((durationDays / totalDays) * 100, 100 - startPercent);
                 
                 const taskBar = document.createElement('div');
                 taskBar.className = `task-bar ${task.phase}`;
-                taskBar.style.left = `${startPercent}%`;
-                taskBar.style.width = `${Math.max(widthPercent, 3)}%`;
-                taskBar.title = `${task.name} (${task.progress}%)`;
+                taskBar.style.left = `${Math.max(0, startPercent)}%`;
+                taskBar.style.width = `${Math.max(widthPercent, 0.5)}%`;
+                taskBar.title = `${task.name} (${task.progress}%) - ${task.startDate} 〜 ${task.endDate}`;
                 
-                const displayName = task.name.length > 12 ? task.name.substring(0, 12) + '...' : task.name;
+                const displayName = task.name.length > 8 ? task.name.substring(0, 8) + '...' : task.name;
                 taskBar.textContent = displayName;
                 
                 taskBar.onclick = () => editTask(task.id);
