@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIKUDA制作スケジュール - ガントチャート</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #2c3e50;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e1e8ed;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .gantt-wrapper {
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        .gantt-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1000px;
+            background: white;
+        }
+
+        .month-header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            text-align: center;
+            padding: 12px 8px;
+            font-weight: 600;
+            border: 1px solid #34495e;
+            font-size: 13px;
+        }
+
+        .week-header {
+            background: #ecf0f1;
+            text-align: center;
+            padding: 6px 4px;
+            font-size: 11px;
+            color: #7f8c8d;
+            border: 1px solid #bdc3c7;
+            width: 50px;
+        }
+
+        .category-header {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            font-weight: 700;
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            width: 250px;
+            color: #2c3e50;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .category-header:hover {
+            background: linear-gradient(135deg, #e9ecef, #dee2e6);
+        }
+
+        .task-cell {
+            padding: 10px 12px;
+            border: 1px solid #dee2e6;
+            width: 250px;
+            background: white;
+            position: relative;
+        }
+
+        .task-name {
+            font-weight: 500;
+            margin-bottom: 3px;
+            font-size: 13px;
+            color: #2c3e50;
+        }
+
+        .task-info {
+            font-size: 10px;
+            color: #7f8c8d;
+            line-height: 1.3;
+        }
+
+        .edit-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 3px 6px;
+            font-size: 9px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .task-cell:hover .edit-btn {
+            opacity: 1;
+        }
+
+        .timeline-cell {
+            width: 50px;
+            height: 45px;
+            border: 1px solid #dee2e6;
+            position: relative;
+            background: white;
+        }
+
+        .timeline-cell:nth-child(4n) {
+            background: #fff8f0;
+        }
+
+        .task-bar {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 18px;
+            border-radius: 9px;
+            color: white;
+            font-size: 8px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding: 0 3px;
+            z-index: 2;
+        }
+
+        .task-bar:hover {
+            transform: translateY(-50%) scale(1.1);
+            z-index: 10;
+            height: 22px;
+        }
+
+        .phase1 { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .phase2 { background: linear-gradient(135deg, #f39c12, #d68910); }
+        .phase3 { background: linear-gradient(135deg, #3498db, #2980b9); }
+        .mcp { background: linear-gradient(135deg, #27ae60, #229954); }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1001;
+            font-size: 14px;
+        }
+
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .stats {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e1e8ed;
+            text-align: center;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 5px;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+            }
+            
+            .controls {
+                padding: 15px;
+            }
+            
+            .gantt-wrapper {
+                padding: 10px;
+            }
+            
+            .task-cell,
+            .category-header {
+                width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏗️ NIKUDA制作スケジュール</h1>
+            <div>カテゴリ別ガントチャート - 実用版</div>
+        </div>
+
+        <div class="stats">
+            <span id="taskCount">タスク数: 0</span> | 
+            <span id="categoryCount">カテゴリ数: 0</span> | 
+            <span>期間: 2025年6月 〜 2026年3月</span>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-success" onclick="addNewTask()">➕ タスク追加</button>
+            <button class="btn btn-primary" onclick="saveData()">💾 データ保存</button>
+            <button class="btn btn-primary" onclick="exportData()">📤 JSON出力</button>
+            <button class="btn btn-secondary" onclick="resetData()">🔄 リセット</button>
+        </div>
+
+        <div class="gantt-wrapper">
+            <table class="gantt-table" id="ganttTable">
+                <!-- ガントチャートがここに生成される -->
+            </table>
+        </div>
+    </div>
+
+    <!-- タスク編集モーダル -->
+    <div class="modal" id="taskModal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px; color: #2c3e50;">📝 タスク編集</h2>
+            <form id="taskForm">
+                <div class="form-group">
+                    <label>タスク名</label>
+                    <input type="text" id="taskNameInput" required placeholder="例: NIKUDAブランド戦略設計">
+                </div>
+                <div class="form-group">
+                    <label>カテゴリ</label>
+                    <select id="taskCategoryInput">
+                        <option value="1">ブランド戦略・デザイン基盤</option>
+                        <option value="2">Webサイト・システム構築</option>
+                        <option value="3">ゲストハウス事業</option>
+                        <option value="4">印刷物・マーケティング</option>
+                        <option value="5">MCP・技術基盤</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>フェーズ</label>
+                    <select id="taskPhaseInput">
+                        <option value="phase1">Phase 1: 精肉店・海外展開</option>
+                        <option value="phase2">Phase 2: MIFUNE</option>
+                        <option value="phase3">Phase 3: 通販「にくだ」</option>
+                        <option value="mcp">MCP構築</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>開始日</label>
+                    <input type="date" id="taskStartInput" required>
+                </div>
+                <div class="form-group">
+                    <label>終了日</label>
+                    <input type="date" id="taskEndInput" required>
+                </div>
+                <div class="form-group">
+                    <label>進捗 (%)</label>
+                    <input type="range" id="taskProgressInput" min="0" max="100" value="0">
+                    <span id="progressValue">0%</span>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+                    <button type="button" class="btn btn-danger" onclick="deleteTask()" id="deleteBtn">削除</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        // データ
+        let tasks = [];
+        let categories = [];
+        let currentTaskId = null;
+
+        const initialCategories = [
+            { id: 1, name: 'ブランド戦略・デザイン基盤' },
+            { id: 2, name: 'Webサイト・システム構築' },
+            { id: 3, name: 'ゲストハウス事業' },
+            { id: 4, name: '印刷物・マーケティング' },
+            { id: 5, name: 'MCP・技術基盤' }
+        ];
+
+        const initialTasks = [
+            {
+                id: 1,
+                name: 'NIKUDAブランド戦略設計',
+                categoryId: 1,
+                phase: 'phase1',
+                startDate: '2025-06-20',
+                endDate: '2025-07-05',
+                progress: 25
+            },
+            {
+                id: 2,
+                name: '肉のおくだ ブランド設計',
+                categoryId: 1,
+                phase: 'phase1',
+                startDate: '2025-06-25',
+                endDate: '2025-07-10',
+                progress: 0
+            },
+            {
+                id: 3,
+                name: 'コーポレートサイト構築',
+                categoryId: 2,
+                phase: 'phase1',
+                startDate: '2025-07-01',
+                endDate: '2025-07-25',
+                progress: 10
+            },
+            {
+                id: 4,
+                name: 'MIFUNE Webサイト',
+                categoryId: 3,
+                phase: 'phase2',
+                startDate: '2025-07-15',
+                endDate: '2025-08-05',
+                progress: 0
+            },
+            {
+                id: 5,
+                name: 'MCP基盤構築',
+                categoryId: 5,
+                phase: 'mcp',
+                startDate: '2025-06-20',
+                endDate: '2025-08-15',
+                progress: 30
+            }
+        ];
+
+        // 初期化
+        function init() {
+            categories = [...initialCategories];
+            tasks = [...initialTasks];
+            
+            renderGanttChart();
+            updateStats();
+            setupEventListeners();
+            
+            showNotification('✅ ガントチャートを読み込みました');
+        }
+
+        // 統計更新
+        function updateStats() {
+            document.getElementById('taskCount').textContent = `タスク数: ${tasks.length}`;
+            document.getElementById('categoryCount').textContent = `カテゴリ数: ${categories.length}`;
+        }
+
+        // ガントチャート描画
+        function renderGanttChart() {
+            const table = document.getElementById('ganttTable');
+            
+            // ヘッダー作成
+            let headerHTML = '<thead><tr><th class="category-header">カテゴリ / タスク</th>';
+            
+            const months = [
+                '2025年6月', '2025年7月', '2025年8月', '2025年9月', 
+                '2025年10月', '2025年11月', '2025年12月', '2026年1月'
+            ];
+            
+            months.forEach(month => {
+                headerHTML += `<th class="month-header" colspan="4">${month}</th>`;
+            });
+            
+            headerHTML += '</tr><tr><th></th>';
+            
+            for(let i = 0; i < 8; i++) {
+                headerHTML += '<th class="week-header">W1</th><th class="week-header">W2</th><th class="week-header">W3</th><th class="week-header">W4</th>';
+            }
+            
+            headerHTML += '</tr></thead>';
+
+            // ボディ作成
+            let bodyHTML = '<tbody>';
+            
+            categories.forEach(category => {
+                const categoryTasks = tasks.filter(task => task.categoryId === category.id);
+                
+                // カテゴリヘッダー
+                bodyHTML += '<tr>';
+                bodyHTML += `<td class="category-header">📁 ${category.name}</td>`;
+                for(let i = 0; i < 32; i++) {
+                    bodyHTML += '<td style="border: 1px solid #dee2e6; background: #f8f9fa; height: 25px;"></td>';
+                }
+                bodyHTML += '</tr>';
+                
+                // タスク行
+                categoryTasks.forEach(task => {
+                    bodyHTML += '<tr>';
+                    bodyHTML += `<td class="task-cell">
+                        <div class="task-name">${task.name}</div>
+                        <div class="task-info">📅 ${task.startDate} 〜 ${task.endDate}</div>
+                        <div class="task-info">📊 進捗: ${task.progress}%</div>
+                        <button class="edit-btn" onclick="editTask(${task.id})">✏️</button>
+                    </td>`;
+                    
+                    for(let i = 0; i < 32; i++) {
+                        bodyHTML += `<td class="timeline-cell" data-task-id="${task.id}"></td>`;
+                    }
+                    bodyHTML += '</tr>';
+                });
+            });
+            
+            bodyHTML += '</tbody>';
+            table.innerHTML = headerHTML + bodyHTML;
+            
+            setTimeout(renderTaskBars, 50);
+        }
+
+        // タスクバー描画
+        function renderTaskBars() {
+            document.querySelectorAll('.task-bar').forEach(bar => bar.remove());
+            
+            const projectStart = new Date('2025-06-15');
+            
+            tasks.forEach(task => {
+                const startDate = new Date(task.startDate);
+                const endDate = new Date(task.endDate);
+                
+                if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
+                
+                const startWeek = Math.max(0, Math.floor((startDate - projectStart) / (7 * 24 * 60 * 60 * 1000)));
+                const endWeek = Math.floor((endDate - projectStart) / (7 * 24 * 60 * 60 * 1000));
+                const durationWeeks = Math.max(1, endWeek - startWeek + 1);
+                
+                const startPercent = (startWeek / 32) * 100;
+                const widthPercent = Math.min((durationWeeks / 32) * 100, 100 - startPercent);
+                
+                const taskBar = document.createElement('div');
+                taskBar.className = `task-bar ${task.phase}`;
+                taskBar.style.left = `${startPercent}%`;
+                taskBar.style.width = `${Math.max(widthPercent, 3)}%`;
+                taskBar.title = `${task.name} (${task.progress}%)`;
+                
+                const displayName = task.name.length > 12 ? task.name.substring(0, 12) + '...' : task.name;
+                taskBar.textContent = displayName;
+                
+                taskBar.onclick = () => editTask(task.id);
+                
+                const cells = document.querySelectorAll(`[data-task-id="${task.id}"]`);
+                if (cells.length > 0) {
+                    const container = document.createElement('div');
+                    container.style.cssText = 'position: absolute; top: 0; left: 0; width: ' + (cells.length * 100) + '%; height: 100%; pointer-events: none;';
+                    
+                    taskBar.style.pointerEvents = 'auto';
+                    container.appendChild(taskBar);
+                    
+                    cells[0].style.position = 'relative';
+                    cells[0].appendChild(container);
+                }
+            });
+        }
+
+        // タスク編集
+        function editTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            
+            currentTaskId = taskId;
+            
+            document.getElementById('taskNameInput').value = task.name;
+            document.getElementById('taskCategoryInput').value = task.categoryId;
+            document.getElementById('taskPhaseInput').value = task.phase;
+            document.getElementById('taskStartInput').value = task.startDate;
+            document.getElementById('taskEndInput').value = task.endDate;
+            document.getElementById('taskProgressInput').value = task.progress;
+            document.getElementById('progressValue').textContent = task.progress + '%';
+            
+            document.getElementById('deleteBtn').style.display = 'inline-block';
+            document.getElementById('taskModal').classList.add('show');
+        }
+
+        function addNewTask() {
+            currentTaskId = null;
+            
+            document.getElementById('taskNameInput').value = '';
+            document.getElementById('taskCategoryInput').value = '1';
+            document.getElementById('taskPhaseInput').value = 'phase1';
+            document.getElementById('taskStartInput').value = '2025-06-15';
+            document.getElementById('taskEndInput').value = '2025-07-15';
+            document.getElementById('taskProgressInput').value = 0;
+            document.getElementById('progressValue').textContent = '0%';
+            
+            document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('taskModal').classList.add('show');
+        }
+
+        function saveTaskData() {
+            const name = document.getElementById('taskNameInput').value.trim();
+            const categoryId = parseInt(document.getElementById('taskCategoryInput').value);
+            const phase = document.getElementById('taskPhaseInput').value;
+            const startDate = document.getElementById('taskStartInput').value;
+            const endDate = document.getElementById('taskEndInput').value;
+            const progress = parseInt(document.getElementById('taskProgressInput').value);
+            
+            if (!name || !startDate || !endDate) {
+                showNotification('⚠️ 必須項目を入力してください');
+                return;
+            }
+            
+            if (new Date(startDate) > new Date(endDate)) {
+                showNotification('⚠️ 終了日は開始日より後に設定してください');
+                return;
+            }
+            
+            if (currentTaskId) {
+                const taskIndex = tasks.findIndex(t => t.id === currentTaskId);
+                tasks[taskIndex] = { ...tasks[taskIndex], name, categoryId, phase, startDate, endDate, progress };
+                showNotification('✅ タスクを更新しました');
+            } else {
+                const newTask = { id: Date.now(), name, categoryId, phase, startDate, endDate, progress };
+                tasks.push(newTask);
+                showNotification('✅ タスクを追加しました');
+            }
+            
+            closeModal();
+            renderGanttChart();
+            updateStats();
+        }
+
+        function deleteTask() {
+            if (currentTaskId && confirm('このタスクを削除しますか？')) {
+                tasks = tasks.filter(t => t.id !== currentTaskId);
+                closeModal();
+                renderGanttChart();
+                updateStats();
+                showNotification('🗑️ タスクを削除しました');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('taskModal').classList.remove('show');
+            currentTaskId = null;
+        }
+
+        function saveData() {
+            const data = { 
+                project: 'NIKUDA制作スケジュール',
+                tasks, 
+                categories, 
+                exportDate: new Date().toISOString() 
+            };
+            localStorage.setItem('nikuda-gantt-data', JSON.stringify(data));
+            showNotification('💾 データをローカルに保存しました');
+        }
+
+        function exportData() {
+            const data = { 
+                project: 'NIKUDA制作スケジュール',
+                tasks, 
+                categories, 
+                exportDate: new Date().toISOString() 
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'nikuda-gantt-chart.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showNotification('📤 JSONファイルをダウンロードしました');
+        }
+
+        function resetData() {
+            if (confirm('データをリセットしますか？')) {
+                tasks = [...initialTasks];
+                renderGanttChart();
+                updateStats();
+                showNotification('🔄 データをリセットしました');
+            }
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => notification.classList.remove('show'), 3000);
+        }
+
+        function setupEventListeners() {
+            document.getElementById('taskForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveTaskData();
+            });
+
+            document.getElementById('taskProgressInput').addEventListener('input', function() {
+                document.getElementById('progressValue').textContent = this.value + '%';
+            });
+
+            document.getElementById('taskModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+
+            // ローカルストレージからデータ復元
+            const savedData = localStorage.getItem('nikuda-gantt-data');
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    if (data.tasks && data.categories) {
+                        tasks = data.tasks;
+                        categories = data.categories;
+                        renderGanttChart();
+                        updateStats();
+                        showNotification('📂 保存されたデータを読み込みました');
+                    }
+                } catch (e) {
+                    console.error('データ復元エラー:', e);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
